@@ -3,8 +3,9 @@
 **decode your prompts, pay less tokens**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/javi13gl/rosetta?style=flat&color=yellow)](https://github.com/javi13gl/rosetta/stargazers)
 
-A [Claude Code](https://code.claude.com) skill that translates your prompts to English before Claude processes them — cutting **up to 49% of total tokens** on real prompts when combined with [caveman](https://github.com/JuliusBrussee/caveman).
+A [Claude Code](https://code.claude.com) skill that translates your prompts to English before Claude processes them — cutting **up to 71% of total tokens** on real prompts when combined with [caveman](https://github.com/JuliusBrussee/caveman).
 
 Works with any language. Auto-detects input. No API key needed.
 
@@ -14,10 +15,17 @@ Works with any language. Auto-detects input. No API key needed.
 
 ## Before / After
 
-| | |
-|---|---|
-| 🗣️ Normal Claude ES (1750 tokens) | `revisa todos los archivos python del proyecto, hay un bug en load_config que puede fallar silenciosamente...` → Claude reads Spanish, responds verbose |
-| 𓂀 rosetta + caveman (980 tokens) | `/t revisa todos los archivos python...` → Claude receives English, responds terse. **44% less tokens.** |
+**Spanish bug fix — same result, 36% less tokens:**
+
+| 🗣️ Normal Claude (828 tokens) | 🪨 Caveman (587 tokens) | 𓂀 rosetta + caveman (530 tokens) |
+|---|---|---|
+| He revisado el archivo `buggy_auth.py` y he encontrado dos problemas críticos de seguridad. El primero está en la comparación de expiración del token: estás usando `<` en lugar de `<=`, lo que significa que los tokens que expiran exactamente en el momento actual seguirán siendo aceptados. El segundo problema es más grave: la lista `tokens_seen` se inicializa como una lista vacía dentro de la función, lo que significa que se reinicia en cada llamada, haciendo que la detección de replay attacks sea completamente inefectiva... | 2 security bugs. `expiry <` should be `<=` — tokens expiring now still accepted. `tokens_seen` init inside fn → resets each call → replay detect never works. Fix: | `expiry < → <=`. `tokens_seen` init inside fn → reset each call → replay detect broken. Fix: |
+
+**Japanese error handling — same result, 71% less tokens:**
+
+| 🗣️ Normal Claude (3,300 tokens) | 🪨 Caveman (2,100 tokens) | 𓂀 rosetta + caveman (950 tokens) |
+|---|---|---|
+| ご要望の通り、`data_processor.py`の全関数にエラーハンドリングを追加しました。`process_csv`関数については、ファイルが存在しない場合は`FileNotFoundError`を、読み取り権限がない場合は`PermissionError`をキャッチするように修正しました。また、`calculate_average`関数では、データが空の場合のゼロ除算エラーと、データ型の問題による`ValueError`に対応しました... | 3 fns, no error handling. `process_csv`: catch `FileNotFoundError`, `PermissionError`. `calculate_average`: guard empty list → `ZeroDivisionError`, catch `ValueError`. `save_results`: catch `PermissionError`. Fix: | `process_csv`: catch `FileNotFoundError`, `PermissionError`. `calculate_average`: guard empty list → ZeroDivisionError, catch `ValueError` bad types. `save_results`: catch `PermissionError`. Fix: |
 
 Same fix. Same accuracy. Less token.
 
@@ -27,31 +35,31 @@ Same fix. Same accuracy. Less token.
 
 Real token counts from Claude Code TUI. Same prompt, three modes, fresh session each time.
 
-### Short prompts (<65 words) — caveman wins here
+💡 Across testing, longer prompts generally produced higher percentage savings, since the translation overhead stays fixed while tokenization gains scale with prompt length.
 
-| Task | Normal ES | Caveman ES | rosetta + caveman | Saved vs normal |
-|---|---|---|---|---|
-| Explain Python garbage collector | 661 | 512 | 565 | -15% |
+### Spanish — Bug fix (80-word prompt)
 
-> ⚠️ For short prompts, rosetta's bash tool call overhead (~35 tokens) exceeds translation savings. Use caveman alone.
+| Mode | Tokens | vs Normal | vs Caveman |
+|---|---|---|---|
+| Normal ES | 828 | - | - |
+| Caveman ES | 587 | -29% | - |
+| **rosetta + caveman** | **530** | **-36%** | **-10%** |
 
-### Long prompts (65+ words) — rosetta wins here
+### Japanese — Error handling (pure Japanese prompt, no English technical terms)
 
-| Task | Normal ES | Caveman ES | rosetta + caveman | Saved vs normal | Saved vs caveman |
-|---|---|---|---|---|---|
-| Explain GC in detail (70 words) | 1720 | 1340 | 810 | **-53%** | **-40%** |
-| Review Python files for bugs (65 words) | 1750 | 1600 | 980 | **-44%** | **-39%** |
-| **Average** | **1735** | **1470** | **895** | **-48%** | **-39%** |
+| Mode | Tokens | vs Normal | vs Caveman |
+|---|---|---|---|
+| Normal JA | 3,300 | - | - |
+| Caveman JA | 2,100 | -36% | - |
+| **rosetta + caveman** | **950** | **-71%** | **-55%** |
 
-**Break-even point for Spanish: ~65 words.** Above that, rosetta consistently beats caveman alone by ~39%.
+> 💡 The Japanese result shows a key insight: rosetta's savings scale with how "pure" the native language is. Prompts mixing native language with English technical terms (function names, file names) see smaller gains. Prompts written in pure native language see the full effect of the tokenization factor.
 
 ---
 
 ## Multilingual Support
 
 Rosetta auto-detects your language. No configuration needed — just use `/t` in any language.
-
-The savings vary significantly by language. Non-Latin scripts benefit the most due to how LLM tokenizers work:
 
 | Language | Token cost vs English | Input savings | Break-even point |
 |---|---|---|---|
@@ -64,8 +72,6 @@ The savings vary significantly by language. Non-Latin scripts benefit the most d
 | Chinese (Simplified) | 2.0x | ~50% | ~40 words |
 | Arabic | 2.0x | ~50% | ~40 words |
 | Russian | 2.5x | ~60% | ~35 words |
-
-For Japanese, Chinese, Arabic, or Russian speakers, rosetta is significantly more impactful than for Spanish or French users. A Japanese developer writing 50-word prompts already exceeds the break-even point.
 
 All data based on Ahia et al., EMNLP 2023 — *Do All Languages Cost the Same?*
 
@@ -114,16 +120,16 @@ Write long prompts in your language with `/t`:
 /t revisa el módulo de autenticación, el token expiry usa < en vez de <=
 
 # Japanese
-/t 認証モジュールを確認して、トークンの有効期限チェックが<を使っています
+/t このファイルにはエラー処理が全くありません。考えられるすべての問題に対してエラー処理を追加してください
 
 # Chinese
-/t 检查认证模块，token过期检查使用了<而不是<=
+/t 检查认证模块，token过期检查使用了<而不是<=，还有重放攻击检测也有问题
 
 # Arabic
 /t راجع وحدة المصادقة، يستخدم فحص انتهاء الرمز < بدلاً من <=
 ```
 
-Write short prompts directly in English — rosetta overhead not worth it below the break-even point for your language.
+Write short prompts and code-heavy tasks directly in English — rosetta overhead not worth it below the break-even point or when output is mostly code blocks.
 
 ---
 
@@ -163,9 +169,8 @@ Russian  (60% savings): break-even at ~58 tokens  (~35 words)
 │                                              │
 │  OUTPUT SAVINGS (caveman)  ████████████  65% │
 │                                              │
-│  REAL-WORLD NET (Spanish)  ████████░░░░  49% │
-│  REAL-WORLD NET (Japanese) ██████████░░  57% │
-│  REAL-WORLD NET (Russian)  ████████████  63% │
+│  REAL-WORLD NET (Spanish)  ████████░░░░  36% │
+│  REAL-WORLD NET (Japanese) ████████████  71% │
 └──────────────────────────────────────────────┘
 ```
 
@@ -174,16 +179,16 @@ Russian  (60% savings): break-even at ~58 tokens  (~35 words)
 ## How It Works
 
 ```
-You type:    /t revisa el módulo de autenticación...
+You type:    /t このファイルにはエラー処理が全くありません...
                           ↓
              translate.py → Google Translate API (free, no key)
              auto-detects language, translates to English
                           ↓
-Claude receives: "review the authentication module..."
+Claude receives: "This file has no error handling at all..."
                           ↓
              caveman compresses the response
                           ↓
-You get:     terse English answer, up to 49-63% fewer tokens
+You get:     terse English answer, up to 71% fewer tokens
 ```
 
 Claude never sees the original language. Zero LLM translation cost.
@@ -194,8 +199,9 @@ Claude never sees the original language. Zero LLM translation cost.
 
 - Requires Python 3 and internet access for Google Translate
 - Only worth using above the break-even point for your language (see table above)
+- Less effective when prompts mix native language with English technical terms (function names, file paths)
+- Less effective for code-heavy tasks where output is mostly code blocks (caveman doesn't compress code)
 - Bash tool call appears in Claude Code transcript — this overhead defines the break-even
-- Output is always in English — pair with caveman for maximum compression
 
 ---
 
