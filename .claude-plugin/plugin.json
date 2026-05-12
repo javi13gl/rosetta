@@ -1,0 +1,8 @@
+{
+  "name": "rosetta",
+  "description": "Translate prompts to English before Claude processes them. ~49% token savings on real prompts. Works best combined with caveman.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Javier Garcia Laguna"
+  }
+}
